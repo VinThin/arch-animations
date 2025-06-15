@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silver Core DB Data Ingestion Pipeline - Phase 3: Custom Field Processing & Completion</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13/dist/gsap.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: white;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .container {
+            width: 1600px;
+            height: 700px;
+            position: relative;
+            margin: 0 auto;
+            background: rgba(248, 249, 250, 0.8);
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .title {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+
+        .component {
+            position: absolute;
+            width: 140px;
+            height: 100px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            opacity: 0;
+            transform: scale(0.8);
+            gap: 8px;
+        }
+
+        .component svg {
+            width: 35px;
+            height: 35px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.5;
+        }
+
+        .component .icon-label {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* Phase 3 Components */
+        .blended-snapshot {
+            background: #27ae60;
+            top: 300px;
+            left: 50px;
+        }
+
+        .custom-field-detector {
+            background: #9b59b6;
+            top: 300px;
+            left: 250px;
+        }
+
+        .business-logic {
+            background: #e67e22;
+            top: 300px;
+            left: 450px;
+        }
+
+        .custom-fields-history {
+            background: #c0392b;
+            top: 300px;
+            left: 650px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .custom-fields-history:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .last-processed-update {
+            background: #f4d03f;
+            color: #2c3e50;
+            top: 300px;
+            left: 850px;
+        }
+
+        .datadog-metrics {
+            background: #8e44ad;
+            top: 300px;
+            left: 1050px;
+        }
+
+        .loop-back {
+            background: #16a085;
+            top: 450px;
+            left: 50px;
+            z-index: 10;
+        }
+
+        /* Status banner */
+        .status-banner {
+            position: absolute;
+            right: 20px;
+            top: 100px;
+            width: 320px;
+            height: 500px;
+            background: rgba(248, 249, 250, 0.9);
+            border-radius: 15px;
+            border: 2px solid rgba(44, 62, 80, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .status-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            border-radius: 13px 13px 0 0;
+        }
+
+        .status-content {
+            height: 420px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(44, 62, 80, 0.1);
+            font-size: 13px;
+            color: #2c3e50;
+            opacity: 0;
+            transform: translateY(20px);
+            line-height: 1.4;
+        }
+
+        .status-item.active {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 4px solid #9b59b6;
+        }
+
+        .data-stream {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            opacity: 0;
+            box-shadow: 0 0 8px rgba(0,0,0,0.4);
+        }
+
+        /* Data streams */
+        .blended-stream {
+            background: #27ae60;
+            top: 344px;
+            left: 190px;
+        }
+
+        .detection-stream {
+            background: #9b59b6;
+            top: 344px;
+            left: 390px;
+        }
+
+        .logic-stream {
+            background: #e67e22;
+            top: 344px;
+            left: 590px;
+        }
+
+        .history-stream {
+            background: #c0392b;
+            top: 344px;
+            left: 790px;
+        }
+
+        .update-stream {
+            background: #f4d03f;
+            top: 344px;
+            left: 990px;
+        }
+
+        .metrics-stream {
+            background: #8e44ad;
+            top: 344px;
+            left: 1190px;
+        }
+
+        .loop-stream {
+            background: #16a085;
+            top: 192px;
+            left: 1290px;
+        }
+
+        .flow-path {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, rgba(44, 62, 80, 0.3), transparent);
+            height: 2px;
+            opacity: 0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+
+        .pulse {
+            animation: componentPulse 2s infinite;
+        }
+
+        @keyframes componentPulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            }
+            50% { 
+                transform: scale(1.05);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            }
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Silver Core DB Data Ingestion Pipeline - Phase 3: Custom Field Processing & Completion</h1>
+        
+        <!-- Phase 3 Components -->
+        <div class="component blended-snapshot">
+            <svg viewBox="0 0 24 24">
+                <path d="M20 6L9 17L4 12"/>
+                <rect x="3" y="4" width="18" height="16" rx="2"/>
+                <path d="M7 10L12 15L17 8"/>
+            </svg>
+            <div class="icon-label">Blended Snapshot<br/>(From Phase 2)</div>
+        </div>
+
+        <div class="component custom-field-detector">
+            <svg viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21L16.65 16.65"/>
+                <path d="M11 8V14"/>
+                <path d="M8 11H14"/>
+            </svg>
+            <div class="icon-label">Custom Field<br/>Detector</div>
+        </div>
+
+        <div class="component business-logic">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+                <path d="M2 17L12 22L22 17"/>
+                <path d="M2 12L12 17L22 12"/>
+            </svg>
+            <div class="icon-label">Custom Fields<br/>Aggregation & Processing</div>
+        </div>
+
+        <a href="https://dbc-e5cf6531-3970.cloud.databricks.com/explore/data/prod_silver_coredb_internal_us01/custom_fields_history/custom_fields_data" target="_blank" style="text-decoration: none; color: inherit;">
+            <div class="component custom-fields-history">
+                <svg viewBox="0 0 24 24">
+                    <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z"/>
+                    <path d="M14 2V8H20"/>
+                    <path d="M16 13H8"/>
+                    <path d="M16 17H8"/>
+                    <path d="M10 9H8"/>
+                </svg>
+                <div class="icon-label">Custom Fields<br/>History Table</div>
+            </div>
+        </a>
+
+        <div class="component last-processed-update">
+            <svg viewBox="0 0 24 24">
+                <path d="M21 15V19C21 19.55 20.55 20 20 20H4C3.45 20 3 19.55 3 19V15"/>
+                <path d="M7 10L12 15L17 10"/>
+                <path d="M12 15V3"/>
+            </svg>
+            <div class="icon-label">Last Processed<br/>Table Update</div>
+        </div>
+
+        <div class="component datadog-metrics">
+            <svg viewBox="0 0 24 24">
+                <path d="M3 3V21H21"/>
+                <path d="M9 9L12 6L16 10L20 6"/>
+                <circle cx="9" cy="9" r="1"/>
+                <circle cx="12" cy="6" r="1"/>
+                <circle cx="16" cy="10" r="1"/>
+                <circle cx="20" cy="6" r="1"/>
+            </svg>
+            <div class="icon-label">DataDog<br/>Latency Metrics</div>
+        </div>
+
+        <div class="component loop-back">
+            <svg viewBox="0 0 24 24">
+                <path d="M3 12C3 7.03 7.03 3 12 3S21 7.03 21 12"/>
+                <path d="M18 15L21 12L18 9"/>
+                <path d="M12 21C7.03 21 3 16.97 3 12"/>
+            </svg>
+            <div class="icon-label">Loop Back to<br/>Phase 1</div>
+        </div>
+
+
+
+        <!-- Data Streams -->
+        <div class="data-stream blended-stream"></div>
+        <div class="data-stream detection-stream"></div>
+        <div class="data-stream logic-stream"></div>
+        <div class="data-stream history-stream"></div>
+        <div class="data-stream update-stream"></div>
+        <div class="data-stream metrics-stream"></div>
+        <div class="data-stream loop-stream"></div>
+
+        <!-- Status Banner -->
+        <div class="status-banner">
+            <div class="status-header">Phase 3 Flow</div>
+            <div class="status-content">
+                <div class="status-item" id="status1">🔍 Scanning blended snapshot for custom fields...</div>
+                <div class="status-item" id="status2">📋 Found 47 tables with custom_fields column</div>
+                <div class="status-item" id="status3">⚙️ Applying business logic transformations...</div>
+                <div class="status-item" id="status4">💾 Saving to custom fields history table...</div>
+                <div class="status-item" id="status5">📝 Updating last processed timestamp...</div>
+                <div class="status-item" id="status6">📊 Emitting latency metrics to DataDog...</div>
+                <div class="status-item" id="status7">🔄 Process completed - latency: 400s</div>
+                <div class="status-item" id="status8">🚀 Initiating Phase 1 restart...</div>
+                <div class="status-item" id="status9">🔁 Continuous processing active</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize components - show them once and keep them visible
+        gsap.set('.component', { opacity: 1, scale: 1 });
+
+        // Initial entrance animation (only runs once)
+        const initialTl = gsap.timeline();
+        initialTl.from('.blended-snapshot', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' })
+                .from('.custom-field-detector', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .from('.business-logic', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .from('.custom-fields-history', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .from('.last-processed-update', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .from('.datadog-metrics', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .from('.loop-back', { opacity: 0, scale: 0.8, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4');
+
+        // Data flow animations
+        function createDataFlow() {
+            // Blended snapshot to detector
+            gsap.set('.blended-stream', { x: 0 });
+            gsap.to('.blended-stream', {
+                opacity: 1,
+                x: 200,
+                duration: 1.5,
+                ease: 'power2.inOut',
+                onComplete: () => {
+                    gsap.set('.blended-stream', { opacity: 0, x: 0 });
+                    // Pulse detector
+                    gsap.to('.custom-field-detector', { scale: 1.1, duration: 0.3, yoyo: true, repeat: 1 });
+                }
+            });
+
+            // Detector to business logic
+            setTimeout(() => {
+                gsap.set('.detection-stream', { x: 0 });
+                gsap.to('.detection-stream', {
+                    opacity: 1,
+                    x: 200,
+                    duration: 1.5,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        gsap.set('.detection-stream', { opacity: 0, x: 0 });
+                        gsap.to('.business-logic', { scale: 1.1, duration: 0.3, yoyo: true, repeat: 1 });
+                    }
+                });
+            }, 1000);
+
+            // Business logic to history table
+            setTimeout(() => {
+                gsap.set('.logic-stream', { x: 0 });
+                gsap.to('.logic-stream', {
+                    opacity: 1,
+                    x: 200,
+                    duration: 1.5,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        gsap.set('.logic-stream', { opacity: 0, x: 0 });
+                        gsap.to('.custom-fields-history', { scale: 1.1, duration: 0.3, yoyo: true, repeat: 1 });
+                    }
+                });
+            }, 2000);
+
+            // History to last processed
+            setTimeout(() => {
+                gsap.set('.history-stream', { x: 0 });
+                gsap.to('.history-stream', {
+                    opacity: 1,
+                    x: 200,
+                    duration: 1.5,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        gsap.set('.history-stream', { opacity: 0, x: 0 });
+                        gsap.to('.last-processed-update', { scale: 1.1, duration: 0.3, yoyo: true, repeat: 1 });
+                    }
+                });
+            }, 3000);
+
+            // Last processed to DataDog
+            setTimeout(() => {
+                gsap.set('.update-stream', { x: 0 });
+                gsap.to('.update-stream', {
+                    opacity: 1,
+                    x: 200,
+                    duration: 1.5,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        gsap.set('.update-stream', { opacity: 0, x: 0 });
+                        gsap.to('.datadog-metrics', { scale: 1.1, duration: 0.3, yoyo: true, repeat: 1 });
+                    }
+                });
+            }, 4000);
+
+            // DataDog to loop back (two-step animation)
+            setTimeout(() => {
+                gsap.set('.metrics-stream', { x: 0, y: 0 });
+                // First move down
+                gsap.to('.metrics-stream', {
+                    opacity: 1,
+                    y: 106,
+                    duration: 1,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        // Then move left to the loop back position
+                        gsap.to('.metrics-stream', {
+                            x: -1000,
+                            duration: 2,
+                            ease: 'power2.inOut',
+                            onComplete: () => {
+                                gsap.set('.metrics-stream', { opacity: 0, x: 0, y: 0 });
+                                gsap.to('.loop-back', { scale: 1.1, duration: 0.3, yoyo: true, repeat: 1 });
+                            }
+                        });
+                    }
+                });
+            }, 5000);
+        }
+
+        // Status updates
+        function updateStatus() {
+            const statusItems = document.querySelectorAll('.status-item');
+            let currentIndex = 0;
+
+            function showNextStatus() {
+                if (currentIndex > 0) {
+                    statusItems[currentIndex - 1].classList.remove('active');
+                    gsap.to(statusItems[currentIndex - 1], { opacity: 0.6, duration: 0.3 });
+                }
+
+                if (currentIndex < statusItems.length) {
+                    statusItems[currentIndex].classList.add('active');
+                    gsap.to(statusItems[currentIndex], { 
+                        opacity: 1, 
+                        y: 0, 
+                        duration: 0.5,
+                        ease: 'back.out(1.7)'
+                    });
+                    currentIndex++;
+                    setTimeout(showNextStatus, 800);
+                } else {
+                    // Reset for next cycle
+                    setTimeout(() => {
+                        statusItems.forEach(item => {
+                            item.classList.remove('active');
+                            gsap.set(item, { opacity: 0, y: 20 });
+                        });
+                        currentIndex = 0;
+                        setTimeout(showNextStatus, 1000);
+                    }, 2000);
+                }
+            }
+
+            showNextStatus();
+        }
+
+        // Start animations after initial setup
+        setTimeout(() => {
+            createDataFlow();
+            updateStatus();
+            
+            // Repeat data flow
+            setInterval(createDataFlow, 12000);
+        }, 3000);
+
+        // Continuous component pulsing
+        setInterval(() => {
+            const components = ['.blended-snapshot', '.custom-field-detector', '.business-logic', 
+                              '.custom-fields-history', '.last-processed-update', '.datadog-metrics'];
+            const randomComponent = components[Math.floor(Math.random() * components.length)];
+            gsap.to(randomComponent, { scale: 1.05, duration: 0.5, yoyo: true, repeat: 1 });
+        }, 2000);
+    </script>
+</body>
+</html> 

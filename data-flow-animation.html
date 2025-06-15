@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Flow Animation with GSAP</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@hugeicons/core-free-icons@0.2.0/index.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: white;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .container {
+            width: 1200px;
+            height: 600px;
+            position: relative;
+            margin: 0 auto;
+            background: rgba(248, 249, 250, 0.8);
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .title {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+
+        .component {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            opacity: 0;
+            transform: scale(0.8);
+            gap: 8px;
+        }
+
+        .component svg {
+            width: 40px;
+            height: 40px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.5;
+        }
+
+        .component .icon-label {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        .updates {
+            background: #3c4f5c;
+            top: 240px;
+            left: 50px;
+        }
+
+        .postgres {
+            background: #e67e47;
+            top: 240px;
+            left: 250px;
+        }
+
+        .debezium {
+            background: #f4d03f;
+            color: #2c3e50;
+            top: 240px;
+            left: 450px;
+        }
+
+        .kafka {
+            background: #a3c585;
+            top: 240px;
+            left: 650px;
+        }
+
+        .sparkstream {
+            background: #7fb3b3;
+            top: 240px;
+            left: 850px;
+        }
+
+        .databricks {
+            background: #6ca6c7;
+            top: 240px;
+            left: 1050px;
+        }
+
+        .arrow {
+            position: absolute;
+            width: 60px;
+            height: 4px;
+            background: #2c3e50;
+            top: 298px;
+            opacity: 0;
+            border-radius: 2px;
+        }
+
+        .arrow::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: -6px;
+            width: 0;
+            height: 0;
+            border-left: 15px solid #2c3e50;
+            border-top: 7px solid transparent;
+            border-bottom: 7px solid transparent;
+        }
+
+        .arrow1 { left: 180px; }
+        .arrow2 { left: 380px; }
+        .arrow3 { left: 580px; }
+        .arrow4 { 
+            left: 780px; 
+            transform: rotate(180deg);
+        }
+        .arrow5 { left: 980px; }
+
+        .data-packet {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #3c4f5c;
+            border-radius: 50%;
+            top: 290px;
+            left: 30px;
+            opacity: 0;
+            box-shadow: 0 0 15px rgba(60, 79, 92, 0.6);
+        }
+
+        .continuous-update {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #e67e47;
+            border-radius: 50%;
+            top: 294px;
+            left: 34px;
+            opacity: 0;
+            box-shadow: 0 0 10px rgba(230, 126, 71, 0.6);
+        }
+
+        .black-ball {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #2c3e50;
+            border-radius: 50%;
+            top: 292px;
+            left: 234px;
+            opacity: 0;
+            box-shadow: 0 0 12px rgba(44, 62, 80, 0.6);
+        }
+
+        .spark-ball {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: #6ca6c7;
+            border-radius: 50%;
+            top: 293px;
+            left: 834px;
+            opacity: 0;
+            box-shadow: 0 0 10px rgba(108, 166, 199, 0.6);
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .btn {
+            background: #3c4f5c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #2c3e50;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Real-time Data Pipeline Animation</div>
+    
+    <div class="container">
+        <div class="legend">
+            <div><strong>Data Flow:</strong></div>
+            <div>Updates → PostgreSQL → Debezium → Kafka → SparkStream → Databricks</div>
+        </div>
+
+        <!-- Components -->
+        <div class="component updates">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.5 19H8C4 19 2 17 2 13V8C2 4 4 2 8 2H16C20 2 22 4 22 8V13C22 17 20 19 16 19H15.5C15.19 19 14.89 19.15 14.7 19.4L13.2 21.4C12.54 22.28 11.46 22.28 10.8 21.4L9.3 19.4C9.14 19.18 8.77 19 8.5 19Z"/>
+            </svg>
+            <div class="icon-label">Updates</div>
+        </div>
+        <div class="component postgres">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V9C2 4 4 2 9 2H14"/>
+                <path d="M22 10H18C15 10 14 9 14 6V2L22 10Z"/>
+                <path d="M7 13H13"/>
+                <path d="M7 17H11"/>
+            </svg>
+            <div class="icon-label">PostgreSQL</div>
+        </div>
+        <div class="component debezium">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V9C2 4 4 2 9 2H14"/>
+                <path d="M22 10H18C15 10 14 9 14 6V2L22 10Z"/>
+                <path d="M7 13H13"/>
+                <path d="M7 17H11"/>
+                <path d="M12.25 2C13.04 2.01 13.77 2.1 14.44 2.26"/>
+                <path d="M17.74 5.56C18.12 6.04 18.44 6.58 18.69 7.19"/>
+            </svg>
+            <div class="icon-label">Debezium</div>
+        </div>
+        <div class="component kafka">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6.44 9C6.8 7.83 7.79 7 9 7C10.21 7 11.2 7.83 11.56 9"/>
+                <path d="M12.44 9C12.8 7.83 13.79 7 15 7C16.21 7 17.2 7.83 17.56 9"/>
+                <path d="M18.44 9C18.8 7.83 19.79 7 21 7"/>
+                <path d="M3 7H4.5"/>
+                <path d="M6 15H9L11 17H15L17 15H21"/>
+                <path d="M12 9V15"/>
+                <path d="M6 9V15"/>
+                <path d="M18 9V15"/>
+            </svg>
+            <div class="icon-label">Kafka</div>
+        </div>
+        <div class="component sparkstream">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 15C13.66 15 15 13.66 15 12C15 10.34 13.66 9 12 9C10.34 9 9 10.34 9 12C9 13.66 10.34 15 12 15Z"/>
+                <path d="M19.14 12.94C19.18 12.64 19.2 12.33 19.2 12C19.2 11.67 19.18 11.36 19.14 11.06L20.81 9.81C20.95 9.7 20.99 9.51 20.91 9.36L19.36 6.64C19.28 6.49 19.09 6.44 18.94 6.5L17.06 7.29C16.67 6.97 16.23 6.71 15.75 6.53L15.49 4.50C15.47 4.33 15.32 4.2 15.15 4.2H12.04C11.87 4.2 11.72 4.33 11.7 4.50L11.44 6.53C10.96 6.71 10.52 6.97 10.13 7.29L8.25 6.5C8.1 6.44 7.91 6.49 7.83 6.64L6.28 9.36C6.2 9.51 6.24 9.7 6.38 9.81L8.05 11.06C8.01 11.36 7.99 11.67 7.99 12C7.99 12.33 8.01 12.64 8.05 12.94L6.38 14.19C6.24 14.3 6.2 14.49 6.28 14.64L7.83 17.36C7.91 17.51 8.1 17.56 8.25 17.5L10.13 16.71C10.52 17.03 10.96 17.29 11.44 17.47L11.7 19.5C11.72 19.67 11.87 19.8 12.04 19.8H15.15C15.32 19.8 15.47 19.67 15.49 19.5L15.75 17.47C16.23 17.29 16.67 17.03 17.06 16.71L18.94 17.5C19.09 17.56 19.28 17.51 19.36 17.36L20.91 14.64C20.99 14.49 20.95 14.3 20.81 14.19L19.14 12.94Z"/>
+            </svg>
+            <div class="icon-label">SparkStream</div>
+        </div>
+        <div class="component databricks">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 12L12 2L19 12H16L12 6.5L8 12H5Z"/>
+                <path d="M19 12L12 22L5 12H8L12 17.5L16 12H19Z"/>
+                <path d="M7 10V14H17V10"/>
+                <path d="M9.5 8V16"/>
+                <path d="M14.5 8V16"/>
+            </svg>
+            <div class="icon-label">Databricks</div>
+        </div>
+
+        <!-- Arrows -->
+        <div class="arrow arrow1"></div>
+        <div class="arrow arrow2"></div>
+        <div class="arrow arrow3"></div>
+        <div class="arrow arrow4"></div>
+        <div class="arrow arrow5"></div>
+
+        <!-- Data packet -->
+        <div class="data-packet"></div>
+
+        <!-- Continuous updates -->
+        <div class="continuous-update" id="update1"></div>
+        <div class="continuous-update" id="update2"></div>
+        <div class="continuous-update" id="update3"></div>
+
+        <!-- Black balls PostgreSQL to Kafka -->
+        <div class="black-ball" id="blackball1"></div>
+        <div class="black-ball" id="blackball2"></div>
+        <div class="black-ball" id="blackball3"></div>
+
+        <!-- Spark balls SparkStream to Databricks -->
+        <div class="spark-ball" id="sparkball1"></div>
+        <div class="spark-ball" id="sparkball2"></div>
+        <div class="spark-ball" id="sparkball3"></div>
+    </div>
+
+
+
+    <script>
+        let updateTimeline, blackBallTimeline, sparkBallTimeline, setupTimeline;
+
+        function createSetupAnimation() {
+            setupTimeline = gsap.timeline();
+
+            // Show components sequentially
+            setupTimeline.to(".updates", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            }, 0)
+            .to(".postgres", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            }, 0.2)
+            .to(".debezium", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            }, 0.4)
+            .to(".kafka", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            }, 0.6)
+            .to(".sparkstream", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            }, 0.8)
+            .to(".databricks", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            }, 1.0)
+
+            // Show arrows sequentially
+            .to(".arrow1", { 
+                opacity: 1, 
+                duration: 0.4,
+                ease: "power2.out" 
+            }, 1.5)
+            .to(".arrow2", { 
+                opacity: 1, 
+                duration: 0.4,
+                ease: "power2.out" 
+            }, 1.7)
+            .to(".arrow3", { 
+                opacity: 1, 
+                duration: 0.4,
+                ease: "power2.out" 
+            }, 1.9)
+            .to(".arrow4", { 
+                opacity: 1, 
+                duration: 0.4,
+                ease: "power2.out" 
+            }, 2.1)
+            .to(".arrow5", { 
+                opacity: 1, 
+                duration: 0.4,
+                ease: "power2.out" 
+            }, 2.3);
+
+            return setupTimeline;
+        }
+
+        function createUpdateAnimation() {
+            updateTimeline = gsap.timeline({ repeat: -1 });
+            
+            // Orange balls: Updates → PostgreSQL (continuous)
+            updateTimeline.to("#update1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#update1", { 
+                left: 234, 
+                duration: 1.5, 
+                ease: "power2.inOut" 
+            }, 0.2)
+            .to("#update1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.4)
+            .to("#update1", { 
+                left: 34, 
+                duration: 0 
+            }, 1.7)
+            
+            .to("#update2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.8)
+            .to("#update2", { 
+                left: 234, 
+                duration: 1.5, 
+                ease: "power2.inOut" 
+            }, 1.0)
+            .to("#update2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.2)
+            .to("#update2", { 
+                left: 34, 
+                duration: 0 
+            }, 2.5)
+            
+            .to("#update3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.6)
+            .to("#update3", { 
+                left: 234, 
+                duration: 1.5, 
+                ease: "power2.inOut" 
+            }, 1.8)
+            .to("#update3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.0)
+            .to("#update3", { 
+                left: 34, 
+                duration: 0 
+            }, 3.3);
+            
+            return updateTimeline;
+        }
+
+        function createBlackBallAnimation() {
+            blackBallTimeline = gsap.timeline({ repeat: -1 });
+            
+            // Black balls: PostgreSQL → Kafka (continuous)
+            blackBallTimeline.to("#blackball1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#blackball1", { 
+                left: 634, 
+                duration: 2, 
+                ease: "power2.inOut" 
+            }, 0.2)
+            .to("#blackball1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.9)
+            .to("#blackball1", { 
+                left: 234, 
+                duration: 0 
+            }, 2.2)
+            
+            .to("#blackball2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.0)
+            .to("#blackball2", { 
+                left: 634, 
+                duration: 2, 
+                ease: "power2.inOut" 
+            }, 1.2)
+            .to("#blackball2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.9)
+            .to("#blackball2", { 
+                left: 234, 
+                duration: 0 
+            }, 3.2)
+            
+            .to("#blackball3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 2.0)
+            .to("#blackball3", { 
+                left: 634, 
+                duration: 2, 
+                ease: "power2.inOut" 
+            }, 2.2)
+            .to("#blackball3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.9)
+            .to("#blackball3", { 
+                left: 234, 
+                duration: 0 
+            }, 4.2);
+            
+            return blackBallTimeline;
+        }
+
+        function createSparkBallAnimation() {
+            sparkBallTimeline = gsap.timeline({ repeat: -1 });
+            
+            // Spark balls: SparkStream → Databricks (continuous)
+            sparkBallTimeline.to("#sparkball1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#sparkball1", { 
+                left: 1034, 
+                duration: 1.8, 
+                ease: "power2.inOut" 
+            }, 0.2)
+            .to("#sparkball1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.7)
+            .to("#sparkball1", { 
+                left: 834, 
+                duration: 0 
+            }, 2.0)
+            
+            .to("#sparkball2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.9)
+            .to("#sparkball2", { 
+                left: 1034, 
+                duration: 1.8, 
+                ease: "power2.inOut" 
+            }, 1.1)
+            .to("#sparkball2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.6)
+            .to("#sparkball2", { 
+                left: 834, 
+                duration: 0 
+            }, 2.9)
+            
+            .to("#sparkball3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.8)
+            .to("#sparkball3", { 
+                left: 1034, 
+                duration: 1.8, 
+                ease: "power2.inOut" 
+            }, 2.0)
+            .to("#sparkball3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.5)
+            .to("#sparkball3", { 
+                left: 834, 
+                duration: 0 
+            }, 3.8);
+            
+            return sparkBallTimeline;
+        }
+
+        // Initialize and start all animations
+        function startAllAnimations() {
+            setupTimeline = createSetupAnimation();
+            updateTimeline = createUpdateAnimation();
+            blackBallTimeline = createBlackBallAnimation();
+            sparkBallTimeline = createSparkBallAnimation();
+
+            // Start setup animation first
+            setupTimeline.play();
+            
+            // Start continuous animations after setup
+            gsap.delayedCall(3, () => {
+                updateTimeline.play();
+                blackBallTimeline.play();
+                sparkBallTimeline.play();
+            });
+        }
+
+        // Auto-start everything when page loads
+        gsap.delayedCall(0.5, startAllAnimations);
+    </script>
+</body>
+</html> 

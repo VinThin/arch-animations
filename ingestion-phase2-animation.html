@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silver Core DB Data Ingestion Pipeline - Phase 2: Blended Processing & Transformation</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13/dist/gsap.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+            background: white;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .container {
+            width: 1600px;
+            height: 700px;
+            position: relative;
+            margin: 0 auto;
+            background: rgba(248, 249, 250, 0.8);
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .title {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+
+        .component {
+            position: absolute;
+            width: 140px;
+            height: 100px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            opacity: 0;
+            transform: scale(0.8);
+            gap: 8px;
+        }
+
+        .component svg {
+            width: 35px;
+            height: 35px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.5;
+        }
+
+        .component .icon-label {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* Phase 2 Components */
+        .temp-snapshot {
+            background: #6ca6c7;
+            top: 300px;
+            left: 50px;
+        }
+
+        .staging-table {
+            background: #3c4f5c;
+            top: 150px;
+            left: 250px;
+        }
+
+        .cdc-processor {
+            background: #8e44ad;
+            top: 300px;
+            left: 250px;
+        }
+
+        .deduplicator {
+            background: #f39c12;
+            top: 300px;
+            left: 450px;
+        }
+
+        .transformer {
+            background: #e74c3c;
+            top: 300px;
+            left: 650px;
+        }
+
+        .blended-snapshot {
+            background: #27ae60;
+            top: 300px;
+            left: 850px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .blended-snapshot:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .multi-thread {
+            background: #34495e;
+            top: 300px;
+            left: 1050px;
+        }
+
+        .unity-catalog {
+            background: #2980b9;
+            top: 450px;
+            left: 1050px;
+        }
+
+        /* Multi-threading visualization - REMOVED */
+        .thread-container {
+            display: none;
+        }
+
+        .thread-line {
+            display: none;
+        }
+
+        /* Status banner */
+        .status-banner {
+            position: absolute;
+            right: 20px;
+            top: 100px;
+            width: 320px;
+            height: 580px;
+            background: rgba(248, 249, 250, 0.9);
+            border-radius: 15px;
+            border: 2px solid rgba(44, 62, 80, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .status-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            border-radius: 13px 13px 0 0;
+        }
+
+        .status-content {
+            height: 500px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(44, 62, 80, 0.1);
+            font-size: 13px;
+            color: #2c3e50;
+            opacity: 0;
+            transform: translateY(20px);
+            line-height: 1.4;
+        }
+
+        .status-item.active {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 4px solid #9b59b6;
+        }
+
+        .data-stream {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            opacity: 0;
+            box-shadow: 0 0 8px rgba(0,0,0,0.4);
+        }
+
+        /* ID streams from temp snapshot */
+        .id-stream {
+            background: #6ca6c7;
+            top: 344px;
+            left: 190px;
+        }
+
+        /* CDC data streams */
+        .cdc-stream {
+            background: #8e44ad;
+            top: 192px;
+            left: 260px;
+        }
+
+        /* Deduplication streams */
+        .dedup-stream {
+            background: #f39c12;
+            top: 344px;
+            left: 390px;
+        }
+
+        /* Transformation streams */
+        .transform-stream {
+            background: #e74c3c;
+            top: 344px;
+            left: 590px;
+        }
+
+        /* Blended streams */
+        .blended-stream {
+            background: #27ae60;
+            top: 344px;
+            left: 790px;
+        }
+
+        /* Multi-threaded streams */
+        .thread-stream {
+            background: #34495e;
+            width: 8px;
+            height: 8px;
+            top: 344px;
+            left: 990px;
+        }
+
+        /* Unity catalog streams */
+        .unity-stream {
+            background: #2980b9;
+            width: 8px;
+            height: 8px;
+            top: 394px;
+            left: 1120px;
+        }
+
+        #unity1 { left: 1070px; }
+        #unity2 { left: 1090px; }
+        #unity3 { left: 1110px; }
+        #unity4 { left: 1130px; }
+        #unity5 { left: 1150px; }
+        #unity6 { left: 1170px; }
+        #unity7 { left: 1080px; }
+        #unity8 { left: 1100px; }
+        #unity9 { left: 1120px; }
+        #unity10 { left: 1140px; }
+
+        .path7 { 
+            width: 2px; 
+            height: 100px;
+            top: 394px; 
+            left: 1120px;
+            background: linear-gradient(180deg, transparent, rgba(44, 62, 80, 0.3), transparent);
+        }
+
+        /* Flow paths */
+        .path1 { 
+            width: 140px; 
+            top: 344px; 
+            left: 200px; 
+        }
+        .path2 { 
+            width: 100px; 
+            top: 192px; 
+            left: 300px; 
+            transform: rotate(25deg);
+            transform-origin: left center;
+        }
+        .path3 { 
+            width: 140px; 
+            top: 344px; 
+            left: 400px; 
+        }
+        .path4 { 
+            width: 140px; 
+            top: 344px; 
+            left: 600px; 
+        }
+        .path5 { 
+            width: 140px; 
+            top: 344px; 
+            left: 800px; 
+        }
+        .path6 { 
+            width: 140px; 
+            top: 344px; 
+            left: 1000px; 
+        }
+
+        .legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #2c3e50;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+
+        .flow-path {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, rgba(44, 62, 80, 0.3), transparent);
+            height: 2px;
+            opacity: 0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+
+    </style>
+</head>
+<body>
+            <div class="title">Silver Core DB Data Ingestion Pipeline - Phase 2: Blended Processing & Transformation</div>
+    
+    <div class="container">
+        <div class="legend">
+            <div><strong>Process Flow:</strong></div>
+            <div>1. Use temp snapshot IDs to fetch full CDC data</div>
+            <div>2. Deduplicate by latest records</div>
+            <div>3. Apply transformations (timestamp, string→array)</div>
+            <div>4. Create blended snapshot</div>
+            <div>5. Multi-threaded append to Unity Catalog</div>
+        </div>
+
+
+
+        <!-- Components -->
+        <div class="component temp-snapshot">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"/>
+                <path d="M14 2V8H20"/>
+                <path d="M8 13H16"/>
+                <path d="M8 17H13"/>
+                <path d="M8 9H10"/>
+            </svg>
+            <div class="icon-label">Temp Snapshot<br/>(IDs Only)</div>
+        </div>
+
+        <div class="component staging-table">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V9C2 4 4 2 9 2H14"/>
+                <path d="M22 10H18C15 10 14 9 14 6V2L22 10Z"/>
+                <path d="M7 13H13"/>
+                <path d="M7 17H11"/>
+            </svg>
+            <div class="icon-label">Staging Table<br/>(Full CDC Data)</div>
+        </div>
+
+        <div class="component cdc-processor">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 16V8C21 5.79 19.21 4 17 4H7C4.79 4 3 5.79 3 8V16C3 18.21 4.79 20 7 20H17C19.21 20 21 18.21 21 16Z"/>
+                <path d="M7 12H17"/>
+                <path d="M12 7V17"/>
+            </svg>
+            <div class="icon-label">CDC Processor</div>
+        </div>
+
+        <div class="component deduplicator">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 4H18C19.1 4 20 4.9 20 6V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V6C4 4.9 4.9 4 6 4H8"/>
+                <path d="M15 2H9C8.4 2 8 2.4 8 3V5C8 5.6 8.4 6 9 6H15C15.6 6 16 5.6 16 5V3C16 2.4 15.6 2 15 2Z"/>
+                <path d="M9 12H15"/>
+                <path d="M9 16H12"/>
+            </svg>
+            <div class="icon-label">Deduplicator<br/>(Latest Records)</div>
+        </div>
+
+        <div class="component transformer">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14.7 6.3C15.1 5.9 15.1 5.3 14.7 4.9C14.3 4.5 13.7 4.5 13.3 4.9L8.7 9.5C8.3 9.9 8.3 10.5 8.7 10.9L13.3 15.5C13.7 15.9 14.3 15.9 14.7 15.5C15.1 15.1 15.1 14.5 14.7 14.1L11.4 10.8H20C20.6 10.8 21 10.4 21 9.8C21 9.2 20.6 8.8 20 8.8H11.4L14.7 5.5"/>
+                <path d="M3 12H8"/>
+                <path d="M3 18H8"/>
+                <path d="M3 6H8"/>
+            </svg>
+            <div class="icon-label">Transformer<br/>(Timestamp, Arrays)</div>
+        </div>
+
+        <a href="https://dbc-e5cf6531-3970.cloud.databricks.com/explore/data/prod_silver_coredb_internal_us01/pipeline_intermediates/blended_tmp_snapshot_ready?o=8249203942030835" target="_blank" style="text-decoration: none; color: inherit;">
+            <div class="component blended-snapshot">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"/>
+                    <path d="M14 2V8H20"/>
+                    <path d="M8 13H16"/>
+                    <path d="M8 17H16"/>
+                    <path d="M8 9H16"/>
+                </svg>
+                <div class="icon-label">Blended Snapshot<br/>(Transformed)</div>
+            </div>
+        </a>
+
+        <div class="component unity-catalog">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 7V10C4 10.55 4.45 11 5 11H9C9.55 11 10 10.55 10 10V7C10 6.45 9.55 6 9 6H5C4.45 6 4 6.45 4 7Z"/>
+                <path d="M14 7V10C14 10.55 14.45 11 15 11H19C19.55 11 20 10.55 20 10V7C20 6.45 19.55 6 19 6H15C14.45 6 14 6.45 14 7Z"/>
+                <path d="M4 14V17C4 17.55 4.45 18 5 18H9C9.55 18 10 17.55 10 17V14C10 13.45 9.55 13 9 13H5C4.45 13 4 13.45 4 14Z"/>
+                <path d="M14 14V17C14 17.55 14.45 18 15 18H19C19.55 18 20 17.55 20 17V14C14 13.45 14.45 13 15 13H19C19.55 13 20 13.45 20 14Z"/>
+            </svg>
+            <div class="icon-label">Unity Catalog<br/>Public History Schema<br/>(300-600 Tables)</div>
+        </div>
+
+        <div class="component multi-thread">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+                <path d="M2 17L12 22L22 17"/>
+                <path d="M2 12L12 17L22 12"/>
+            </svg>
+            <div class="icon-label">Multi-Threading<br/>(Parallel Append)</div>
+        </div>
+
+        <!-- Status Banner -->
+        <div class="status-banner">
+            <div class="status-header">Phase 2 Flow</div>
+            <div class="status-content">
+                <div class="status-item" id="status1">🆔 Reading temp snapshot IDs...</div>
+                <div class="status-item" id="status2">📊 Fetching full CDC data from staging...</div>
+                <div class="status-item" id="status3">🔄 Processing CDC records...</div>
+                <div class="status-item" id="status4">🧹 Deduplicating by latest records...</div>
+                <div class="status-item" id="status5">⏰ Converting timestamps...</div>
+                <div class="status-item" id="status6">🔗 Converting strings to arrays...</div>
+                <div class="status-item" id="status7">📝 Creating blended snapshot...</div>
+                <div class="status-item" id="status8">🚀 Starting multi-threaded append...</div>
+                <div class="status-item" id="status9">💾 Writing to Unity Catalog tables...</div>
+                <div class="status-item" id="status10">✨ Phase 2 complete!</div>
+                <div class="status-item" id="status11">🔄 Ready for Phase 3...</div>
+            </div>
+        </div>
+
+        <!-- Flow paths -->
+        <div class="flow-path path1"></div>
+        <div class="flow-path path2"></div>
+        <div class="flow-path path3"></div>
+        <div class="flow-path path4"></div>
+        <div class="flow-path path5"></div>
+        <div class="flow-path path6"></div>
+        <div class="flow-path path7"></div>
+
+        <!-- Data streams -->
+        <div class="data-stream id-stream" id="id1"></div>
+        <div class="data-stream id-stream" id="id2"></div>
+        <div class="data-stream id-stream" id="id3"></div>
+        
+        <div class="data-stream cdc-stream" id="cdc1"></div>
+        <div class="data-stream cdc-stream" id="cdc2"></div>
+        <div class="data-stream cdc-stream" id="cdc3"></div>
+        
+        <div class="data-stream dedup-stream" id="dedup1"></div>
+        <div class="data-stream dedup-stream" id="dedup2"></div>
+        
+        <div class="data-stream transform-stream" id="transform1"></div>
+        <div class="data-stream transform-stream" id="transform2"></div>
+        <div class="data-stream transform-stream" id="transform3"></div>
+        
+        <div class="data-stream blended-stream" id="blended1"></div>
+        <div class="data-stream blended-stream" id="blended2"></div>
+        <div class="data-stream blended-stream" id="blended3"></div>
+        
+        <div class="data-stream thread-stream" id="thread1"></div>
+        <div class="data-stream thread-stream" id="thread2"></div>
+        <div class="data-stream thread-stream" id="thread3"></div>
+        
+        <div class="data-stream unity-stream" id="unity1"></div>
+        <div class="data-stream unity-stream" id="unity2"></div>
+        <div class="data-stream unity-stream" id="unity3"></div>
+        <div class="data-stream unity-stream" id="unity4"></div>
+        <div class="data-stream unity-stream" id="unity5"></div>
+        <div class="data-stream unity-stream" id="unity6"></div>
+        <div class="data-stream unity-stream" id="unity7"></div>
+        <div class="data-stream unity-stream" id="unity8"></div>
+        <div class="data-stream unity-stream" id="unity9"></div>
+        <div class="data-stream unity-stream" id="unity10"></div>
+    </div>
+
+    <script>
+        let setupTimeline;
+        let idStreams, cdcStreams, transformStreams, dedupStreams, blendedStreams, threadStreams, unityStreams;
+        let statusTimeline;
+
+        function createSetupAnimation() {
+            setupTimeline = gsap.timeline();
+
+            // Show components sequentially
+            setupTimeline.to(".temp-snapshot", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0)
+            .to(".staging-table", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.1)
+            .to(".cdc-processor", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.2)
+            .to(".deduplicator", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.3)
+            .to(".transformer", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.4)
+            .to(".blended-snapshot", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.5)
+            .to(".multi-thread", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.6)
+            .to(".unity-catalog", { 
+                opacity: 1, 
+                scale: 1, 
+                duration: 0.6, 
+                ease: "back.out(1.4)" 
+            }, 0.7)
+            .to(".status-banner", { 
+                opacity: 1, 
+                duration: 0.8, 
+                ease: "power2.out" 
+            }, 0.8)
+
+            // Show flow paths
+            .to(".flow-path", { 
+                opacity: 1, 
+                duration: 0.8,
+                ease: "power2.out" 
+            }, 1.4);
+
+            return setupTimeline;
+        }
+
+        function updateStatus() {
+            const statusItems = document.querySelectorAll('.status-item');
+            let currentIndex = 0;
+
+            function showNextStatus() {
+                if (currentIndex > 0) {
+                    statusItems[currentIndex - 1].classList.remove('active');
+                    gsap.to(statusItems[currentIndex - 1], { opacity: 0.6, duration: 0.3 });
+                }
+
+                if (currentIndex < statusItems.length) {
+                    statusItems[currentIndex].classList.add('active');
+                    gsap.to(statusItems[currentIndex], { 
+                        opacity: 1, 
+                        y: 0, 
+                        duration: 0.5,
+                        ease: 'back.out(1.7)'
+                    });
+                    currentIndex++;
+                    setTimeout(showNextStatus, 800);
+                } else {
+                    // Reset for next cycle
+                    setTimeout(() => {
+                        statusItems.forEach(item => {
+                            item.classList.remove('active');
+                            gsap.set(item, { opacity: 0, y: 20 });
+                        });
+                        currentIndex = 0;
+                        setTimeout(showNextStatus, 1000);
+                    }, 2000);
+                }
+            }
+
+            showNextStatus();
+        }
+
+        function createContinuousStreams() {
+            // ID streams from temp snapshot to CDC processor
+            idStreams = gsap.timeline({ repeat: -1 });
+            
+            idStreams.to("#id1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#id1", { 
+                left: 260, 
+                duration: 1.2, 
+                ease: "power1.inOut" 
+            }, 0.2)
+            .to("#id1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.2)
+            .to("#id1", { 
+                left: 190, 
+                duration: 0 
+            }, 1.5)
+
+            .to("#id2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.6)
+            .to("#id2", { 
+                left: 260, 
+                duration: 1.2, 
+                ease: "power1.inOut" 
+            }, 0.8)
+            .to("#id2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.8)
+            .to("#id2", { 
+                left: 190, 
+                duration: 0 
+            }, 2.1)
+
+            .to("#id3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.2)
+            .to("#id3", { 
+                left: 260, 
+                duration: 1.2, 
+                ease: "power1.inOut" 
+            }, 1.4)
+            .to("#id3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.4)
+            .to("#id3", { 
+                left: 190, 
+                duration: 0 
+            }, 2.7);
+
+            // CDC data streams from staging to CDC processor
+            cdcStreams = gsap.timeline({ repeat: -1 });
+            
+            cdcStreams.to("#cdc1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#cdc1", { 
+                left: 260, 
+                top: 340, 
+                duration: 1.5, 
+                ease: "power1.inOut" 
+            }, 0.2)
+            .to("#cdc1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.5)
+            .to("#cdc1", { 
+                left: 260, 
+                top: 192, 
+                duration: 0 
+            }, 1.8)
+
+            .to("#cdc2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.8)
+            .to("#cdc2", { 
+                left: 260, 
+                top: 340, 
+                duration: 1.5, 
+                ease: "power1.inOut" 
+            }, 1.0)
+            .to("#cdc2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.3)
+            .to("#cdc2", { 
+                left: 260, 
+                top: 192, 
+                duration: 0 
+            }, 2.6)
+
+            .to("#cdc3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.6)
+            .to("#cdc3", { 
+                left: 260, 
+                top: 340, 
+                duration: 1.5, 
+                ease: "power1.inOut" 
+            }, 1.8)
+            .to("#cdc3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.1)
+            .to("#cdc3", { 
+                left: 260, 
+                top: 192, 
+                duration: 0 
+            }, 3.4);
+
+            // Deduplication streams (now comes first)
+            dedupStreams = gsap.timeline({ repeat: -1 });
+            
+            dedupStreams.to("#dedup1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#dedup1", { 
+                left: 460, 
+                duration: 1.3, 
+                ease: "power1.inOut" 
+            }, 0.2)
+            .to("#dedup1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.3)
+            .to("#dedup1", { 
+                left: 390, 
+                duration: 0 
+            }, 1.6)
+
+            .to("#dedup2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.5)
+            .to("#dedup2", { 
+                left: 460, 
+                duration: 1.3, 
+                ease: "power1.inOut" 
+            }, 1.7)
+            .to("#dedup2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.8)
+            .to("#dedup2", { 
+                left: 390, 
+                duration: 0 
+            }, 3.1);
+
+            // Transformation streams (now comes after dedup)
+            transformStreams = gsap.timeline({ repeat: -1 });
+            
+            transformStreams.to("#transform1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#transform1", { 
+                left: 660, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 0.2)
+            .to("#transform1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.4)
+            .to("#transform1", { 
+                left: 590, 
+                duration: 0 
+            }, 1.7)
+
+            .to("#transform2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.8)
+            .to("#transform2", { 
+                left: 660, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 1.0)
+            .to("#transform2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.2)
+            .to("#transform2", { 
+                left: 590, 
+                duration: 0 
+            }, 2.5)
+
+            .to("#transform3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.6)
+            .to("#transform3", { 
+                left: 660, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 1.8)
+            .to("#transform3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.0)
+            .to("#transform3", { 
+                left: 590, 
+                duration: 0 
+            }, 3.3);
+
+            // Blended snapshot streams
+            blendedStreams = gsap.timeline({ repeat: -1 });
+            
+            blendedStreams.to("#blended1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#blended1", { 
+                left: 860, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 0.2)
+            .to("#blended1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.4)
+            .to("#blended1", { 
+                left: 790, 
+                duration: 0 
+            }, 1.7)
+
+            .to("#blended2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.8)
+            .to("#blended2", { 
+                left: 860, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 1.0)
+            .to("#blended2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.2)
+            .to("#blended2", { 
+                left: 790, 
+                duration: 0 
+            }, 2.5)
+
+            .to("#blended3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.6)
+            .to("#blended3", { 
+                left: 860, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 1.8)
+            .to("#blended3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.0)
+            .to("#blended3", { 
+                left: 790, 
+                duration: 0 
+            }, 3.3);
+
+            // Multi-threaded streams (blended to multi-thread)
+            threadStreams = gsap.timeline({ repeat: -1 });
+            
+            threadStreams.to("#thread1", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0)
+            .to("#thread1", { 
+                left: 1060, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 0.2)
+            .to("#thread1", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 1.4)
+            .to("#thread1", { 
+                left: 990, 
+                duration: 0 
+            }, 1.7)
+
+            .to("#thread2", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 0.8)
+            .to("#thread2", { 
+                left: 1060, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 1.0)
+            .to("#thread2", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 2.2)
+            .to("#thread2", { 
+                left: 990, 
+                duration: 0 
+            }, 2.5)
+
+            .to("#thread3", { 
+                opacity: 1, 
+                duration: 0.2 
+            }, 1.6)
+            .to("#thread3", { 
+                left: 1060, 
+                duration: 1.4, 
+                ease: "power1.inOut" 
+            }, 1.8)
+            .to("#thread3", { 
+                opacity: 0, 
+                duration: 0.3 
+            }, 3.0)
+            .to("#thread3", { 
+                left: 990, 
+                duration: 0 
+            }, 3.3);
+
+            // Unity catalog streams (multi-thread to unity catalog) - LOTS OF PARALLEL STREAMS
+            unityStreams = gsap.timeline({ repeat: -1 });
+            
+            // Create 10 parallel streams with rapid staggered timing to show heavy multi-threading
+            const unityIds = ["#unity1", "#unity2", "#unity3", "#unity4", "#unity5", "#unity6", "#unity7", "#unity8", "#unity9", "#unity10"];
+            
+            unityIds.forEach((unityId, index) => {
+                const startTime = index * 0.15; // Rapid fire timing
+                
+                unityStreams.to(unityId, { 
+                    opacity: 1, 
+                    duration: 0.2 
+                }, startTime)
+                .to(unityId, { 
+                    top: 460, 
+                    duration: 0.8, 
+                    ease: "power1.inOut" 
+                }, startTime + 0.2)
+                .to(unityId, { 
+                    opacity: 0, 
+                    duration: 0.3 
+                }, startTime + 0.8)
+                .to(unityId, { 
+                    top: 394, 
+                    duration: 0 
+                }, startTime + 1.1);
+            });
+            
+            // Add second wave for continuous heavy flow
+            unityIds.forEach((unityId, index) => {
+                const startTime = 2.0 + (index * 0.12); // Second wave
+                
+                unityStreams.to(unityId, { 
+                    opacity: 1, 
+                    duration: 0.2 
+                }, startTime)
+                .to(unityId, { 
+                    top: 460, 
+                    duration: 0.8, 
+                    ease: "power1.inOut" 
+                }, startTime + 0.2)
+                .to(unityId, { 
+                    opacity: 0, 
+                    duration: 0.3 
+                }, startTime + 0.8)
+                .to(unityId, { 
+                    top: 394, 
+                    duration: 0 
+                }, startTime + 1.1);
+            });
+        }
+
+        function createComponentPulses() {
+            // Pulse components when they receive data
+            gsap.timeline({ repeat: -1 })
+                .to(".cdc-processor", { 
+                    scale: 1.08, 
+                    duration: 0.15, 
+                    yoyo: true, 
+                    repeat: 1, 
+                    ease: "power2.inOut" 
+                }, 0)
+                .to(".deduplicator", { 
+                    scale: 1.08, 
+                    duration: 0.15, 
+                    yoyo: true, 
+                    repeat: 1, 
+                    ease: "power2.inOut" 
+                }, 1.5)
+                .to(".transformer", { 
+                    scale: 1.1, 
+                    duration: 0.2, 
+                    yoyo: true, 
+                    repeat: 1, 
+                    ease: "power2.inOut" 
+                }, 3.0)
+                .to(".blended-snapshot", { 
+                    scale: 1.1, 
+                    duration: 0.2, 
+                    yoyo: true, 
+                    repeat: 1, 
+                    ease: "power2.inOut" 
+                }, 4.5)
+                .to(".multi-thread", { 
+                    scale: 1.12, 
+                    duration: 0.25, 
+                    yoyo: true, 
+                    repeat: 2, 
+                    ease: "power2.inOut" 
+                }, 6.0)
+                .to(".unity-catalog", { 
+                    scale: 1.12, 
+                    duration: 0.25, 
+                    yoyo: true, 
+                    repeat: 2, 
+                    ease: "power2.inOut" 
+                }, 7.5);
+        }
+
+        // Initialize and start all animations
+        function startAllAnimations() {
+            setupTimeline = createSetupAnimation();
+
+            // Start setup animation first
+            setupTimeline.play();
+            
+            // Start continuous streams and status after setup
+            gsap.delayedCall(2.5, () => {
+                createContinuousStreams();
+                createComponentPulses();
+                updateStatus();
+                
+                idStreams.play();
+                cdcStreams.play();
+                transformStreams.play();
+                dedupStreams.play();
+                blendedStreams.play();
+                threadStreams.play();
+                unityStreams.play();
+            });
+        }
+
+        // Auto-start everything when page loads
+        gsap.delayedCall(0.5, startAllAnimations);
+    </script>
+</body>
+</html> 
