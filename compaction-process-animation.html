@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Compaction Process - Architecture Flow</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/MotionPathPlugin.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 1600px;
+            height: 700px;
+            position: relative;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        /* Engine Central Hub Styling */
+        .compaction-engine {
+            position: absolute;
+            width: 160px;
+            height: 120px;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            border: 3px solid rgba(255,255,255,0.4);
+            opacity: 0;
+            transform: scale(0.8);
+            z-index: 10;
+        }
+
+        .engine-icon {
+            width: 45px;
+            height: 45px;
+            margin-bottom: 8px;
+        }
+
+        /* Process Flow Indicators */
+        .process-step {
+            position: absolute;
+            top: 550px;
+            left: 50px;
+            width: 1000px;
+            height: 60px;
+            background: rgba(248, 249, 250, 0.9);
+            border-radius: 10px;
+            border: 1px solid rgba(44, 62, 80, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: #ecf0f1;
+            transition: all 0.5s ease;
+        }
+
+        .step-indicator.active {
+            background: #3498db;
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .step-indicator.completed {
+            background: #27ae60;
+            color: white;
+        }
+
+        /* Data Flow Animations */
+        .data-flow-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Animated Connection Lines */
+        .connection-path {
+            stroke: #3498db;
+            stroke-width: 3;
+            stroke-dasharray: 8 4;
+            stroke-dashoffset: 0;
+            fill: none;
+            opacity: 0;
+            filter: drop-shadow(0 0 4px rgba(52, 152, 219, 0.5));
+            stroke-dasharray: 1;
+            stroke-dashoffset: 1;
+            pathLength: 1;
+        }
+
+        .connection-path.active {
+            opacity: 1;
+            animation: lineGrow 1.0s ease-out forwards, dash 2s linear infinite 1.0s;
+        }
+
+        @keyframes lineGrow {
+            0% {
+                stroke-dashoffset: 1;
+            }
+            100% {
+                stroke-dashoffset: 0;
+                stroke-dasharray: 8 4;
+            }
+        }
+
+        @keyframes dash {
+            0% { stroke-dashoffset: 12; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        /* Data Packets */
+        .data-packet {
+            position: absolute;
+            width: 20px;
+            height: 14px;
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .data-packet::before {
+            content: '📄';
+            font-size: 8px;
+            color: white;
+        }
+
+        /* Particle Stream Effects */
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #f39c12;
+            border-radius: 50%;
+            opacity: 0;
+            box-shadow: 0 0 4px rgba(243, 156, 18, 0.6);
+        }
+
+        .particle.batch-data {
+            background: #e74c3c;
+            box-shadow: 0 0 4px rgba(231, 76, 60, 0.6);
+        }
+
+        .particle.merge-data {
+            background: #9b59b6;
+            box-shadow: 0 0 4px rgba(155, 89, 182, 0.6);
+        }
+
+        /* Burst Effects */
+        .data-burst {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle, #3498db, transparent);
+            border-radius: 50%;
+            opacity: 0;
+            transform: scale(0);
+        }
+
+        /* Component Active States */
+        .component.reading {
+            background: #f39c12 !important;
+            animation: readingPulse 1.5s infinite;
+        }
+
+        .component.processing {
+            background: #e74c3c !important;
+            animation: processingPulse 1s infinite;
+        }
+
+        .component.completed {
+            background: #27ae60 !important;
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(39, 174, 96, 0.4);
+        }
+
+        @keyframes readingPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 10px 25px rgba(243, 156, 18, 0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 20px 40px rgba(243, 156, 18, 0.5); }
+        }
+
+        @keyframes processingPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 10px 25px rgba(231, 76, 60, 0.3); }
+            50% { transform: scale(1.08); box-shadow: 0 25px 50px rgba(231, 76, 60, 0.5); }
+        }
+
+        @keyframes engineWorking {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .compaction-engine.working {
+            animation: engineWorking 1s infinite;
+        }
+
+        .compaction-engine.working .engine-icon {
+            animation: engineRotate 2s linear infinite;
+        }
+
+        @keyframes engineRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .title {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+
+        .component {
+            position: absolute;
+            width: 140px;
+            height: 100px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            opacity: 0;
+            transform: scale(0.8);
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .component:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .component svg {
+            width: 35px;
+            height: 35px;
+            stroke: white;
+            stroke-width: 1.5px;
+            fill: none;
+        }
+
+        .icon-label {
+            font-size: 11px;
+            margin-top: 4px;
+            line-height: 1.2;
+        }
+
+        /* Component Colors */
+        .last-compacted { background: #2c3e50; }
+        .last-processed { background: #e74c3c; }
+        .backfill-info { background: #f39c12; }
+        .batch-collection { background: #27ae60; }
+        .public-history { background: #3498db; }
+        .merge-process { background: #9b59b6; }
+        .compacted-tables { background: #8e44ad; }
+        .update-tracking { background: #16a085; }
+
+        /* Multi-table indicators */
+        .multi-indicator {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        /* Status Banner */
+        .status-banner {
+            position: absolute;
+            right: 20px;
+            top: 60px;
+            width: 320px;
+            height: 650px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 1px solid rgba(44, 62, 80, 0.15);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        .status-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            border-radius: 13px 13px 0 0;
+        }
+
+        .status-content {
+            height: 570px;
+            overflow-y: auto;
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        .status-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(44, 62, 80, 0.1);
+            font-size: 13px;
+            color: #2c3e50;
+            opacity: 0;
+            transform: translateY(20px);
+            line-height: 1.4;
+        }
+
+        .status-item.active {
+            background: rgba(155, 89, 182, 0.2);
+            border-left: 4px solid #9b59b6;
+        }
+
+        /* Removed old data stream styles */
+
+        /* Threading indicator */
+        .thread-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Silver Layer Compaction Data Flow</h1>
+        
+        <!-- Left Column: Input Tables -->
+        <div class="component last-compacted" style="top: 120px; left: 50px;">
+            <svg viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="15" rx="2"/>
+                <path d="M8 2v4M16 2v4"/>
+            </svg>
+            <div class="icon-label">Last Compacted<br>Table</div>
+        </div>
+
+        <div class="component last-processed" style="top: 240px; left: 50px;">
+            <svg viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10,9 9,9 8,9"/>
+            </svg>
+            <div class="icon-label">Last Processed<br>Table</div>
+        </div>
+
+        <div class="component backfill-info" style="top: 360px; left: 50px;">
+            <svg viewBox="0 0 24 24">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                <path d="M9 14l2 2 4-4"/>
+            </svg>
+            <div class="icon-label">Backfill Batch<br>Info Table</div>
+        </div>
+
+        <!-- Batch ID Collection -->
+        <div class="component batch-collection" style="top: 240px; left: 280px;">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+            </svg>
+            <div class="icon-label">Batch ID<br>Collection</div>
+        </div>
+
+        <!-- Central Compaction Engine -->
+        <div class="compaction-engine" style="top: 200px; left: 520px;">
+            <svg class="engine-icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+            </svg>
+            <div>Compaction Engine</div>
+        </div>
+
+        <!-- Public History beneath Engine -->
+        <div class="component public-history" style="top: 380px; left: 520px;">
+            <svg viewBox="0 0 24 24">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+            <div class="icon-label">Public History<br>Tables</div>
+            <div class="multi-indicator">1K+</div>
+            <div class="thread-indicator">Multi-Thread</div>
+        </div>
+
+        <!-- Right Side: Horizontal Processing -->
+        <div class="component merge-process" style="top: 200px; left: 800px;">
+            <svg viewBox="0 0 24 24">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+            </svg>
+            <div class="icon-label">Merge<br>Operations</div>
+            <div class="thread-indicator">Multi-Thread</div>
+        </div>
+
+        <div class="component compacted-tables" style="top: 200px; left: 1020px;">
+            <svg viewBox="0 0 24 24">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27,6.96 12,12.01 20.73,6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            <div class="icon-label">Compacted<br>Tables</div>
+            <div class="multi-indicator">1K+</div>
+        </div>
+
+        <!-- Update Metadata Tables -->
+        <div class="component update-tracking" style="top: 400px; left: 800px;">
+            <svg viewBox="0 0 24 24">
+                <path d="M21.5 2l-8 20L9 8l-7 4.5"/>
+            </svg>
+            <div class="icon-label">Update Metadata<br>Tables</div>
+        </div>
+
+        <!-- Data Flow Animation Layer -->
+        <div class="data-flow-container">
+            <!-- SVG for Connection Paths -->
+            <svg width="100%" height="100%">
+                <!-- Step 1: Input tables to Batch ID Collection -->
+                <path class="connection-path" id="path-lastcompact-to-batch" 
+                      d="M 190 170 Q 230 200 280 290" pathLength="1" />
+                <path class="connection-path" id="path-lastprocess-to-batch" 
+                      d="M 190 290 Q 230 290 280 290" pathLength="1" />
+                <path class="connection-path" id="path-backfill-to-batch" 
+                      d="M 190 410 Q 230 350 280 290" pathLength="1" />
+                
+                <!-- Step 2: Batch Collection to Engine -->
+                <path class="connection-path" id="path-batch-to-engine" 
+                      d="M 420 290 Q 470 270 520 260" pathLength="1" />
+                
+                <!-- Step 3: Public History to Engine -->
+                <path class="connection-path" id="path-history-to-engine" 
+                      d="M 600 380 Q 620 350 600 320" pathLength="1" />
+                
+                <!-- Step 4: Engine to Merge Operations -->
+                <path class="connection-path" id="path-engine-to-merge" 
+                      d="M 680 240 Q 740 240 800 240" pathLength="1" />
+                
+                <!-- Step 5: Merge to Compacted Tables -->
+                <path class="connection-path" id="path-merge-to-compact" 
+                      d="M 940 240 Q 980 240 1020 240" pathLength="1" />
+                
+                <!-- Step 6: Engine to Update Tracking -->
+                <path class="connection-path" id="path-engine-to-tracking" 
+                      d="M 680 280 Q 740 340 800 450" pathLength="1" />
+            </svg>
+            
+            <!-- Data Packets -->
+            <div class="data-packet" id="packet-1"></div>
+            <div class="data-packet" id="packet-2"></div>
+            <div class="data-packet" id="packet-3"></div>
+            <div class="data-packet" id="packet-4"></div>
+            <div class="data-packet" id="packet-5"></div>
+            
+            <!-- Particles for bulk data -->
+            <div class="particle" id="particle-1"></div>
+            <div class="particle" id="particle-2"></div>
+            <div class="particle" id="particle-3"></div>
+            <div class="particle" id="particle-4"></div>
+            <div class="particle" id="particle-5"></div>
+            <div class="particle batch-data" id="particle-6"></div>
+            <div class="particle batch-data" id="particle-7"></div>
+            <div class="particle merge-data" id="particle-8"></div>
+            <div class="particle merge-data" id="particle-9"></div>
+            <div class="particle merge-data" id="particle-10"></div>
+            
+            <!-- Burst effects -->
+            <div class="data-burst" id="burst-1"></div>
+            <div class="data-burst" id="burst-2"></div>
+            <div class="data-burst" id="burst-3"></div>
+        </div>
+
+        <!-- Process Flow Indicator -->
+        <div class="process-step">
+                            <div class="step-indicator" id="step-1">1. Read Metadata Tables</div>
+                <div class="step-indicator" id="step-2">2. Collect Batch IDs</div>
+                <div class="step-indicator" id="step-3">3. Select Records</div>
+                <div class="step-indicator" id="step-4">4. Merge Data</div>
+                <div class="step-indicator" id="step-5">5. Update Metadata Tables</div>
+        </div>
+
+        <!-- Status Banner -->
+        <div class="status-banner">
+            <div class="status-header">
+                Compaction Data Flow
+            </div>
+            <div class="status-content">
+                <div class="status-item">🔍 Initializing compaction boundaries and reading last compacted batch ID</div>
+                <div class="status-item">📋 Querying last processed table for next batch ID to process</div>
+                <div class="status-item">🎯 Collecting standard batch IDs with UNIX timestamp format</div>
+                <div class="status-item">🔄 Retrieving backfill batch IDs (YYMMDD + UNIX format)</div>
+                <div class="status-item">⚡ Multi-threaded selection from 1,000+ public history tables</div>
+                <div class="status-item">🔀 Processing combined batch ID list across all tables</div>
+                <div class="status-item">🔧 Executing merge commands on 1,000+ delta tables</div>
+                <div class="status-item">💾 Merging into corresponding compacted tables (1:1 mapping)</div>
+                <div class="status-item">📈 Multi-threaded parallel processing for efficiency</div>
+                <div class="status-item">✅ Updating last compact table with processed batch ID</div>
+                <div class="status-item">📝 Recording backfill batch IDs in tracking table</div>
+                <div class="status-item">🎉 Compaction cycle completed successfully!</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize all components and elements as hidden
+        gsap.set('.component', { opacity: 0, scale: 0.8 });
+        gsap.set('.compaction-engine', { opacity: 0, scale: 0.8 });
+        gsap.set('.status-item', { opacity: 0, y: 20 });
+
+        // Component entrance animation
+        const initialTl = gsap.timeline({ delay: 0.5 });
+        
+        // Step 1: Show input components first
+        initialTl.to('.last-compacted', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' })
+                .to('.last-processed', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .to('.backfill-info', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .to('.batch-collection', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                
+        // Step 2: Show central engine
+                .to('.compaction-engine', { opacity: 1, scale: 1, duration: 1, ease: 'back.out(1.7)' }, '-=0.2')
+                
+        // Step 3: Show remaining components
+                .to('.public-history', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .to('.merge-process', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .to('.compacted-tables', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4')
+                .to('.update-tracking', { opacity: 1, scale: 1, duration: 0.8, ease: 'back.out(1.7)' }, '-=0.4');
+
+        // Data Flow Animation Functions
+        function animateDataFlow(step) {
+            switch(step) {
+                case 1:
+                    // Step 1: Input tables → Batch ID Collection
+                    document.getElementById('path-lastcompact-to-batch').classList.add('active');
+                    document.getElementById('path-lastprocess-to-batch').classList.add('active');
+                    document.getElementById('path-backfill-to-batch').classList.add('active');
+                    
+                    // Data packets flying to Batch ID Collection
+                    gsap.set('#packet-1', { x: 190, y: 170, opacity: 1 });
+                    gsap.set('#packet-2', { x: 190, y: 290, opacity: 1 });
+                    gsap.set('#packet-3', { x: 190, y: 410, opacity: 1 });
+                    
+                    gsap.to('#packet-1', { x: 350, y: 290, duration: 1.2, ease: "power2.inOut" });
+                    gsap.to('#packet-2', { x: 350, y: 290, duration: 1.2, delay: 0.2, ease: "power2.inOut" });
+                    gsap.to('#packet-3', { x: 350, y: 290, duration: 1.2, delay: 0.4, ease: "power2.inOut" });
+                    
+                    // Burst at batch collection
+                    setTimeout(() => {
+                        gsap.set('#burst-1', { x: 350, y: 290, opacity: 1, scale: 0 });
+                        gsap.to('#burst-1', { scale: 2, opacity: 0, duration: 0.8 });
+                    }, 1200);
+                    break;
+                    
+                case 2:
+                    // Step 2: Batch Collection → Compaction Engine
+                    document.getElementById('path-batch-to-engine').classList.add('active');
+                    
+                    // Particle stream from batch collection to engine
+                    for(let i = 1; i <= 4; i++) {
+                        gsap.set(`#particle-${i}`, { x: 420, y: 290, opacity: 1 });
+                        gsap.to(`#particle-${i}`, { 
+                            x: 600, y: 260, 
+                            duration: 1.0, 
+                            delay: i * 0.15,
+                            ease: "power2.out",
+                            onComplete: () => gsap.set(`#particle-${i}`, { opacity: 0 })
+                        });
+                    }
+                    break;
+                    
+                case 3:
+                    // Step 3: Public History → Compaction Engine  
+                    document.getElementById('path-history-to-engine').classList.add('active');
+                    
+                    // Multiple particles representing 1000+ tables flowing to engine
+                    const historyParticles = ['particle-5', 'particle-6', 'particle-7', 'particle-8', 'particle-9'];
+                    historyParticles.forEach((id, index) => {
+                        gsap.set(`#${id}`, { x: 600, y: 380, opacity: 1 });
+                        gsap.to(`#${id}`, { 
+                            x: 600, y: 320, 
+                            duration: 1.3, 
+                            delay: index * 0.12,
+                            ease: "power2.inOut",
+                            onComplete: () => gsap.set(`#${id}`, { opacity: 0 })
+                        });
+                    });
+                    
+                    // Engine working burst
+                    setTimeout(() => {
+                        gsap.set('#burst-2', { x: 600, y: 260, opacity: 1, scale: 0 });
+                        gsap.to('#burst-2', { scale: 3, opacity: 0, duration: 1.2 });
+                    }, 800);
+                    break;
+                    
+                case 4:
+                    // Step 4: Engine → Merge Operations & Step 5: Merge → Compacted Tables
+                    document.getElementById('path-engine-to-merge').classList.add('active');
+                    
+                    // Data packet from engine to merge
+                    gsap.set('#packet-4', { x: 680, y: 240, opacity: 1 });
+                    gsap.to('#packet-4', { x: 870, y: 240, duration: 1.3, ease: "power2.inOut" });
+                    
+                    // After merge processes, show connection to compacted tables
+                    setTimeout(() => {
+                        document.getElementById('path-merge-to-compact').classList.add('active');
+                        
+                        // Data flowing from merge to compacted tables
+                        gsap.set('#packet-5', { x: 940, y: 240, opacity: 1 });
+                        gsap.to('#packet-5', { x: 1090, y: 240, duration: 0.8, ease: "power2.out" });
+                        
+                        // Merge processing particles
+                        const mergeParticles = ['particle-1', 'particle-2', 'particle-3'];
+                        mergeParticles.forEach((id, index) => {
+                            gsap.set(`#${id}`, { x: 940, y: 240, opacity: 1 });
+                            gsap.to(`#${id}`, { 
+                                x: 1090, y: 240, 
+                                duration: 1.0, 
+                                delay: index * 0.2,
+                                ease: "power2.out",
+                                onComplete: () => gsap.set(`#${id}`, { opacity: 0 })
+                            });
+                        });
+                    }, 1000);
+                    break;
+                    
+                case 5:
+                    // Step 6: Engine → Update Tracking
+                    document.getElementById('path-engine-to-tracking').classList.add('active');
+                    
+                    // Tracking update data flow
+                    gsap.set('#packet-1', { x: 680, y: 280, opacity: 1 });
+                    gsap.to('#packet-1', { x: 870, y: 450, duration: 1.4, ease: "power2.inOut" });
+                    
+                    // Final completion burst at tracking
+                    setTimeout(() => {
+                        gsap.set('#burst-3', { x: 870, y: 450, opacity: 1, scale: 0 });
+                        gsap.to('#burst-3', { scale: 4, opacity: 0, duration: 1.8 });
+                        
+                        // Success particles at tracking
+                        for(let i = 4; i <= 6; i++) {
+                            gsap.set(`#particle-${i}`, { x: 870, y: 450, opacity: 1 });
+                            gsap.to(`#particle-${i}`, { 
+                                x: 870 + (Math.random() - 0.5) * 60, 
+                                y: 450 + (Math.random() - 0.5) * 40, 
+                                duration: 1.2, 
+                                delay: (i-4) * 0.15,
+                                opacity: 0,
+                                ease: "power2.out"
+                            });
+                        }
+                    }, 1000);
+                    break;
+            }
+        }
+
+        function clearDataFlow() {
+            // Hide all connection paths
+            document.querySelectorAll('.connection-path').forEach(path => {
+                path.classList.remove('active');
+            });
+            
+            // Hide all particles and packets
+            gsap.set('.data-packet, .particle, .data-burst', { opacity: 0 });
+        }
+
+        // Compaction Process Animation
+        function runCompactionProcess() {
+            const tl = gsap.timeline({ repeat: -1, repeatDelay: 3 });
+            
+            // Step 1: Read input tables (orange)
+            tl.call(() => {
+                console.log("Step 1: Reading tables");
+                document.getElementById('step-1').classList.add('active');
+                document.querySelector('.last-compacted').classList.add('reading');
+                document.querySelector('.last-processed').classList.add('reading');
+                document.querySelector('.backfill-info').classList.add('reading');
+                animateDataFlow(1);
+            })
+            .to({}, { duration: 2 }) // Wait 2 seconds
+            
+            // Step 2: Process batch collection (red processing)
+            .call(() => {
+                console.log("Step 2: Processing batch collection");
+                document.getElementById('step-1').classList.remove('active');
+                document.getElementById('step-1').classList.add('completed');
+                document.getElementById('step-2').classList.add('active');
+                
+                // Clear reading states
+                document.querySelector('.last-compacted').classList.remove('reading');
+                document.querySelector('.last-processed').classList.remove('reading');
+                document.querySelector('.backfill-info').classList.remove('reading');
+                
+                // Start processing
+                document.querySelector('.compaction-engine').classList.add('working');
+                document.querySelector('.batch-collection').classList.add('processing');
+                animateDataFlow(2);
+            })
+            .to({}, { duration: 2 }) // Wait 2 seconds
+            
+            // Step 3: Select from public history (orange reading)
+            .call(() => {
+                console.log("Step 3: Reading public history");
+                document.getElementById('step-2').classList.remove('active');
+                document.getElementById('step-2').classList.add('completed');
+                document.getElementById('step-3').classList.add('active');
+                
+                document.querySelector('.batch-collection').classList.remove('processing');
+                document.querySelector('.batch-collection').classList.add('completed');
+                document.querySelector('.public-history').classList.add('reading');
+                animateDataFlow(3);
+            })
+            .to({}, { duration: 2 }) // Wait 2 seconds
+            
+            // Step 4: Merge operations (red processing)
+            .call(() => {
+                console.log("Step 4: Processing merge operations");
+                document.getElementById('step-3').classList.remove('active');
+                document.getElementById('step-3').classList.add('completed');
+                document.getElementById('step-4').classList.add('active');
+                
+                document.querySelector('.public-history').classList.remove('reading');
+                document.querySelector('.public-history').classList.add('completed');
+                document.querySelector('.merge-process').classList.add('processing');
+                animateDataFlow(4);
+            })
+            .to({}, { duration: 2 }) // Wait 2 seconds
+            
+            // Step 5: Update tracking (red processing, then green completed)
+            .call(() => {
+                console.log("Step 5: Updating tracking");
+                document.getElementById('step-4').classList.remove('active');
+                document.getElementById('step-4').classList.add('completed');
+                document.getElementById('step-5').classList.add('active');
+                
+                document.querySelector('.merge-process').classList.remove('processing');
+                document.querySelector('.merge-process').classList.add('completed');
+                document.querySelector('.compacted-tables').classList.add('completed');
+                document.querySelector('.update-tracking').classList.add('processing');
+                animateDataFlow(5);
+            })
+            .to({}, { duration: 2 }) // Wait 2 seconds
+            
+            // Complete everything (all green)
+            .call(() => {
+                console.log("Completing all processes");
+                document.getElementById('step-5').classList.remove('active');
+                document.getElementById('step-5').classList.add('completed');
+                document.querySelector('.update-tracking').classList.remove('processing');
+                document.querySelector('.update-tracking').classList.add('completed');
+                document.querySelector('.compaction-engine').classList.remove('working');
+            })
+            .to({}, { duration: 2 }) // Wait 2 seconds to show completed state
+            
+            // Reset all states
+            .call(() => {
+                console.log("Resetting for next cycle");
+                document.querySelectorAll('.component').forEach(comp => {
+                    comp.classList.remove('reading', 'processing', 'completed');
+                });
+                document.querySelectorAll('.step-indicator').forEach(step => {
+                    step.classList.remove('active', 'completed');
+                });
+                document.querySelector('.compaction-engine').classList.remove('working');
+                clearDataFlow();
+            });
+            
+            return tl;
+        }
+
+        // Status update animation
+        function updateStatus() {
+            const statusItems = document.querySelectorAll('.status-item');
+            let currentIndex = 0;
+
+            function showNextStatus() {
+                if (currentIndex > 0) {
+                    statusItems[currentIndex - 1].classList.remove('active');
+                    gsap.to(statusItems[currentIndex - 1], { opacity: 0.6, duration: 0.3 });
+                }
+
+                if (currentIndex < statusItems.length) {
+                    statusItems[currentIndex].classList.add('active');
+                    gsap.to(statusItems[currentIndex], { 
+                        opacity: 1, 
+                        y: 0, 
+                        duration: 0.5,
+                        ease: 'back.out(1.7)'
+                    });
+                    currentIndex++;
+                    setTimeout(showNextStatus, 800);
+                } else {
+                    // Reset for continuous loop
+                    setTimeout(() => {
+                        statusItems.forEach(item => {
+                            item.classList.remove('active');
+                            gsap.set(item, { opacity: 0, y: 20 });
+                        });
+                        currentIndex = 0;
+                        setTimeout(showNextStatus, 1000);
+                    }, 2000);
+                }
+            }
+            showNextStatus();
+        }
+
+        // Start animations
+        initialTl.call(() => {
+            runCompactionProcess();
+            updateStatus();
+        }, null, "+=1");
+
+        // Enhanced hover effects
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.component, .compaction-engine').forEach(component => {
+                component.addEventListener('mouseenter', () => {
+                    if (!component.classList.contains('processing')) {
+                        gsap.to(component, { scale: 1.1, duration: 0.3 });
+                    }
+                });
+                
+                component.addEventListener('mouseleave', () => {
+                    if (!component.classList.contains('processing')) {
+                        gsap.to(component, { scale: 1, duration: 0.3 });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
